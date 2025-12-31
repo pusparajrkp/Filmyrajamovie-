@@ -240,7 +240,6 @@ def movie_details(c):
     
 # ================= KEEP ALIVE =================
 from app import keep_alive
-keep_alive()
 
 # ================= RUN =================
 bot.infinity_polling()
