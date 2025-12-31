@@ -596,7 +596,7 @@ def movie_details(call):
         )
 
         # Search for movie in private channel database
-        movie_data = search_movie_in_db(title, year)
+        movie_data = None
         
         markup = InlineKeyboardMarkup(row_width=1)
 
