@@ -568,5 +568,88 @@ def search_movie(message):
         markup = InlineKeyboardMarkup(row_width=1)
         for key, movie_data in db_results[:50]:  # show up to 50 matches from DB
             title = movie_data.get("title", "Unknown")
-            year = movie_data.get("year", "N/A")
-   
+                        year = movie_data.get("year", "N/A")
+            qualities = movie_data.get("qualities", {})
+
+            # Add a header/button for the movie (opens details which will show quality buttons)
+            safe_title = title.replace("|", "¦")
+            markup.add(InlineKeyboardButton(f"{title} ({year})", callback_data=f"movie_local|{safe_title}|{year}"))
+
+            # Add quality buttons directly under header for quick download (if many, keep reasonable)
+            quality_order = ["1080p", "720p", "480p", "360p", "240p"]
+            for q in quality_order:
+                if q in qualities:
+                    msg_id = qualities[q]
+                    markup.add(InlineKeyboardButton(f"{title} ({year}) {q}", callback_data=f"download|{msg_id}|{q}"))
+
+        # Add greeting + header (explicit phrasing requested by user)
+        try:
+            bot.send_message(message.chat.id, f"ʜᴇʏ, {message.from_user.first_name} 👋")
+        except Exception:
+            pass
+        header = text_to_bold("🔍 𝐈 𝐅𝐨𝐮𝐧𝐝 𝐒𝐨𝐦𝐞 𝐑𝐞𝐬𝐮𝐥𝐭𝐬 𝐅𝐨𝐫 𝐘𝐨𝐮𝐫 𝐐𝐮𝐞𝐫𝐲 👉 ") + f"{query_for_search}"
+        bot.send_message(message.chat.id, header, reply_markup=markup)
+        return
+
+    # If not found locally or no suitable qualities, search TMDB
+    api_url = "https://api.themoviedb.org/3/search/movie"
+    params = {"api_key": TMDB_API_KEY, "query": query}
+    data = api_request_with_retry(api_url, params)
+    if data is None:
+        bot.send_message(message.chat.id, "❌ Search API error, try again")
+        return
+
+    results = [x for x in data.get("results", []) if x.get("release_date")]
+    if not results:
+        markup = InlineKeyboardMarkup()
+        google_search_url = f"https://www.google.com/search?q={urllib.parse.quote(message.text.strip())}"
+        markup.add(InlineKeyboardButton("🔍 Search on Google", url=google_search_url))
+
+        try:
+            bot.send_message(message.chat.id, f"ʜᴇʏ, {message.from_user.first_name} 👋")
+        except Exception:
+            pass
+
+        message_text = (
+            "❌ Requested Movie is not Available Right Now :\n\n"
+            "⚡ Just Type Movie Name with Year\n"
+            "⚡ For Example \"Dhurandhar 2025\"\n"
+            "⚡ Search in Google for Correct Spelling"
+        )
+        bot.send_message(message.chat.id, message_text, reply_markup=markup)
+        return
+
+    # Send greeting + header then paged results
+    try:
+        bot.send_message(message.chat.id, f"ʜᴇʏ, {message.from_user.first_name} 👋")
+    except Exception:
+        pass
+    send_search_page(message.chat.id, message.from_user.first_name, query_for_search, results, 0)
+
+# ---------- PAGE NAV HANDLER ----------
+@bot.callback_query_handler(func=lambda c: c.data.startswith("page|"))
+def change_page(c):
+    try:
+        _, query, page = c.data.split("|", 2)
+        page = int(page)
+        api_url = "https://api.themoviedb.org/3/search/movie"
+        params = {"api_key": TMDB_API_KEY, "query": query}
+        data = api_request_with_retry(api_url, params)
+        results = [x for x in data.get("results", []) if x.get("release_date")] if data else []
+        # delete previous header message (optional), then send new page results
+        try:
+            bot.delete_message(c.message.chat.id, c.message.message_id)
+        except Exception:
+            pass
+        send_search_page(c.message.chat.id, c.from_user.first_name, query, results, page)
+        bot.answer_callback_query(c.id)
+    except Exception as e:
+        print(f"change_page error: {e}")
+        try:
+            bot.answer_callback_query(c.id, "❌ Error changing page", show_alert=True)
+        except:
+            pass
+
+@bot.callback_query_handler(func=lambda c: c.data == "noop")
+def noop(c):
+    bot.answer_callback_query(c.id)
