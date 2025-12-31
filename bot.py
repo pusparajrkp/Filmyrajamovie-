@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ========= CONFIG =========
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "8375545383:AAEMnp48xXivpUqkcOa1t3tXuDfFxWqe03A"
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "7782831994:AAHwuJVaLNLwngWfjbQMH9NYaGtejQnWvOI"
 TMDB_API_KEY = os.getenv("TMDB_API_KEY") or "03985d11f17343d76561cebc240f5a32"
 
 MOVIE_WEBSITE = "https://www.filmyfiy.mov/site-1.html?to-search="  # <-- apni website
