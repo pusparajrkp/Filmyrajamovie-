@@ -7,12 +7,12 @@ import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ========= CONFIG =========
-BOT_TOKEN = "0"              # Telegram Bot Token
+BOT_TOKEN = "7782831994:AAHwuJVaLNLwngWfjbQMH9NYaGtejQnWvOI"              # Telegram Bot Token
 TMDB_API_KEY = "03985d11f17343d76561cebc240f5a32"           # TMDB API Key
-PRIVATE_CHANNEL_ID = None  # Private channel with movies (integer, e.g. -1001234567890)
+PRIVATE_CHANNEL_ID = -1003304944058  # Private channel with movies (integer, e.g. -1001234567890)
 MOVIES_DB_FILE = "movies_db.json"  # Local database for movie tracking
 USERS_DB_FILE = "users_db.json"    # Local database for users
-ADMIN_IDS = []  # Your Telegram user ID(s) for admin commands, example: [12345678]
+ADMIN_IDS = [6328021097]  # Your Telegram user ID(s) for admin commands, example: [12345678]
 
 WEBSITE_URL = "https://www.filmyfiy.mov/site-1.html?to-search="
 CHANNEL_USERNAME = "@filmyrajamovie"
