@@ -690,7 +690,7 @@ def handle_download(call):
         print(f"Download error: {e}")
         bot.answer_callback_query(call.id, "❌ Error downloading file", show_alert=True)
 
-if name == "main":
+if __name__ == "__main__":
     print("🚀 Bot starting... (Auto-restart enabled)")
     restart_count = 0
     max_restart_count = 10
