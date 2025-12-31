@@ -779,3 +779,64 @@ def movie_details(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("download|"))
 def handle_download(call):
     try:
+        parts = call.data.split("|")
+        msg_id = int(parts[1])
+        quality = parts[2] if len(parts) > 2 else ""
+
+        if PRIVATE_CHANNEL_ID is None:
+            bot.answer_callback_query(call.id, "❌ Server not configured (PRIVATE_CHANNEL_ID)", show_alert=True)
+            return
+
+        # Copy the movie file to user (without channel attribution)
+        bot.copy_message(
+            chat_id=call.message.chat.id,
+            from_chat_id=PRIVATE_CHANNEL_ID,
+            message_id=msg_id
+        )
+
+        bot.answer_callback_query(call.id, f"✅ {quality} downloading...", show_alert=False)
+    except Exception as e:
+        print(f"Download error: {e}")
+        try:
+            bot.answer_callback_query(call.id, "❌ Error downloading file", show_alert=True)
+        except:
+            pass
+
+# ---------- Helper: search movie in DB ----------
+def search_movie_in_db(title, year):
+    """Search for movie in local database"""
+    db = load_movies_db()
+    key = f"{title}_{year}".lower()
+
+    if key in db:
+        return db[key]  # Returns dict with qualities
+
+    # Try fuzzy matching by title only (ignore punctuation and case)
+    for k, v in db.items():
+        if v.get("title", "").lower() == title.lower() and str(v.get("year", "")) == str(year):
+            return v
+    return None
+
+# ---------- RUN ----------
+if __name__ == "__main__":
+    print("✅ Bot started")
+
+    restart_count = 0
+    max_restart_count = 10
+
+    while restart_count < max_restart_count:
+        try:
+            print(f"🚀 Polling... (restart count: {restart_count})")
+            bot.infinity_polling(
+                timeout=15,
+                long_polling_timeout=10,
+                skip_pending=True
+            )
+        except KeyboardInterrupt:
+            print("🛑 Bot stopped by user")
+            break
+        except Exception as e:
+            restart_count += 1
+            print(f"❌ Bot error: {e}")
+            print(f"🔄 Auto-restarting in 10 seconds... ({restart_count}/{max_restart_count})")
+            time.sleep(10)
