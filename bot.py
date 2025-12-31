@@ -568,10 +568,10 @@ def search_movie(message):
         markup = InlineKeyboardMarkup(row_width=1)
         for key, movie_data in db_results[:50]:  # show up to 50 matches from DB
             title = movie_data.get("title", "Unknown")
-                        year = movie_data.get("year", "N/A")
+             year = movie_data.get("year", "N/A")
             qualities = movie_data.get("qualities", {})
 
-            # Add a header/button for the movie (opens details which will show quality buttons)
+           # Add a header/button for the movie (opens details which will show quality buttons)
             safe_title = title.replace("|", "¦")
             markup.add(InlineKeyboardButton(f"{title} ({year})", callback_data=f"movie_local|{safe_title}|{year}"))
 
