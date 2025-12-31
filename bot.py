@@ -653,3 +653,129 @@ def change_page(c):
 @bot.callback_query_handler(func=lambda c: c.data == "noop")
 def noop(c):
     bot.answer_callback_query(c.id)
+
+# ---------- MOVIE DETAILS ----------
+@bot.callback_query_handler(func=lambda call: call.data.startswith("movie|") or call.data.startswith("movie_local|"))
+def movie_details(call):
+    try:
+        # Try to show a friendly header (user requested that "Hey username i found some results" be visible)
+        try:
+            bot.send_message(call.message.chat.id, f"ʜᴇʏ, {call.from_user.first_name} 👋")
+        except Exception:
+            pass
+
+        if call.data.startswith("movie_local|"):
+            # Called from local DB quick button
+            _, safe_title, year = call.data.split("|", 2)
+            title = safe_title.replace("¦", "|")
+            # try to fetch TMDB info by searching title + year
+            params = {"api_key": TMDB_API_KEY, "query": f"{title} {year}"}
+            data = api_request_with_retry("https://api.themoviedb.org/3/search/movie", params)
+            movie = data.get("results", [None])[0] if data and data.get("results") else None
+            movie_id = movie.get("id") if movie else None
+        else:
+            parts = call.data.split("|")
+            movie_id = parts[1]
+            movie = requests.get(f"https://api.themoviedb.org/3/movie/{movie_id}", params={"api_key": TMDB_API_KEY}).json() if movie_id else None
+
+        # If we have movie data from TMDB, extract details
+        if movie:
+            title = movie.get("title") or movie.get("original_title") or ""
+            year = movie.get("release_date")[:4] if movie.get("release_date") else ""
+            lang = (movie.get("original_language") or "").upper()
+            genres = movie.get("genres") or []
+            genre_names = ", ".join([g.get("name", "") for g in genres]) if genres else "N/A"
+
+            # Poster/backdrop selection - use the largest available for a full poster appearance
+            poster = None
+            if movie.get("backdrop_path"):
+                poster = f"https://image.tmdb.org/t/p/w1280{movie['backdrop_path']}"
+            elif movie.get("poster_path"):
+                poster = f"https://image.tmdb.org/t/p/w780{movie['poster_path']}"
+
+            # Check if movie exists in local DB
+            movie_data = None
+            try:
+                movie_data = search_movie_in_db(title, year)
+            except Exception:
+                movie_data = None
+
+            channel_url = f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}"
+
+            # Prepare caption details (consistent style with other captions in this script)
+            if movie_data and movie_data.get("qualities"):
+                # Movie available in private channel -> show our own caption style (not TMDB caption),
+                # show full poster and quality buttons that copy message from private channel
+                quality_order = ["1080p", "720p", "480p", "360p", "240p"]
+                available_qualities = {q: movie_data["qualities"][q] for q in quality_order if q in movie_data["qualities"]}
+
+                kb = InlineKeyboardMarkup(row_width=1)
+
+                # Blue details / channel button
+                details_parts = [f"{title} ({year})"]
+                if available_qualities:
+                    details_parts.append(" ".join(list(available_qualities.keys())))
+                details_text = " • ".join(details_parts)
+                # keep details button opening the channel (Join us)
+                kb.add(InlineKeyboardButton(details_text, url=channel_url))
+
+                # Quality download buttons
+                for quality, msg_id in available_qualities.items():
+                    kb.add(InlineKeyboardButton(f"{title} ({year}) {quality}", callback_data=f"download|{msg_id}|{quality}"))
+
+                kb.add(InlineKeyboardButton("Join Us", url=channel_url))
+
+                # Use our own caption format (as requested)
+                caption = text_to_bold(f"🎬 𝐌𝐎𝐕𝐈𝐄 : {title}\n📅 𝐘𝐄𝐀𝐑 : {year}\n🎞 𝐐𝐔𝐀𝐋𝐈𝐓𝐈𝐄𝐒 : {', '.join(list(available_qualities.keys()))}\n\n📢 Join Us : {CHANNEL_USERNAME}")
+
+                if poster:
+                    bot.send_photo(call.message.chat.id, poster, caption=caption, reply_markup=kb)
+                else:
+                    bot.send_message(call.message.chat.id, caption, reply_markup=kb)
+            else:
+                # Movie not available in private channel -> TMDB style with Watch Now button
+                kb = InlineKeyboardMarkup(row_width=1)
+
+                # Details button that opens your channel (blue)
+                details_text = f"{title} ({year}) • {genre_names}" if genre_names else f"{title} ({year})"
+                kb.add(InlineKeyboardButton(details_text, url=channel_url))
+
+                # Watch now button to website (encoded title)
+                watch_url = WEBSITE_URL + urllib.parse.quote_plus(title)
+                kb.add(InlineKeyboardButton("▶️ Watch Now", url=watch_url))
+
+                kb.add(InlineKeyboardButton("Join Channel", url=channel_url))
+
+                # TMDB style caption but keep the script's styling requirements
+                caption = (
+                    f"🎬 {title} ({year})\n\n"
+                    f"LANGUAGE : {lang}\n"
+                    f"RATING : {movie.get('vote_average','N/A')} ⭐\n"
+                    f"GENRE : {genre_names}\n\n"
+                    f"Movie Watch on website\n\n"
+                    f"📢 Join Us : {CHANNEL_USERNAME}"
+                )
+
+                if poster:
+                    bot.send_photo(call.message.chat.id, poster, caption=caption, reply_markup=kb)
+                else:
+                    bot.send_message(call.message.chat.id, caption, reply_markup=kb)
+        else:
+            bot.answer_callback_query(call.id, "❌ Movie info not found", show_alert=True)
+
+        try:
+            bot.answer_callback_query(call.id)
+        except:
+            pass
+
+    except Exception as e:
+        print(f"Movie details error: {e}")
+        try:
+            bot.answer_callback_query(call.id, "❌ Error loading movie", show_alert=True)
+        except:
+            pass
+
+# ---------- DOWNLOAD HANDLER ----------
+@bot.callback_query_handler(func=lambda call: call.data.startswith("download|"))
+def handle_download(call):
+    try:
